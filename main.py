@@ -1,32 +1,51 @@
-from flask import Flask, request, render_template_string
-import os
+from flask import Flask, request, jsonify, render_template_string
 
 app = Flask(__name__)
 
-# Stockage simple des dernières valeurs
 last_values = {
-    "temp": "N/A",
-    "hum": "N/A"
+    "temp": None,
+    "hum": None
 }
 
 @app.route("/")
 def index():
-    return render_template_string("""
-        <h1>🌿 Suivi de la serre</h1>
-        <p>🌡️ Température : {{ temp }} °C</p>
-        <p>💧 Humidité : {{ hum }} %</p>
-    """, temp=last_values["temp"], hum=last_values["hum"])
+    html = """
+    <html>
+    <head>
+        <title>🌱 Capteur Serre</title>
+        <meta charset="utf-8">
+        <script>
+            async function refreshData() {
+                const response = await fetch('/data');
+                const data = await response.json();
+                document.getElementById('temp').innerText = data.temp || 'N/A';
+                document.getElementById('hum').innerText = data.hum || 'N/A';
+            }
+
+            setInterval(refreshData, 2000); // refresh every 2 seconds
+            window.onload = refreshData;
+        </script>
+    </head>
+    <body>
+        <h1>🌿 Données de la serre</h1>
+        <p>🌡️ Température : <span id="temp">N/A</span> °C</p>
+        <p>💧 Humidité : <span id="hum">N/A</span> %</p>
+    </body>
+    </html>
+    """
+    return render_template_string(html)
 
 @app.route("/update")
 def update():
     temp = request.args.get("temp")
     hum = request.args.get("hum")
+
     if temp and hum:
         last_values["temp"] = temp
         last_values["hum"] = hum
         return "✅ Données mises à jour"
     return "❌ Paramètres manquants", 400
 
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))  # Render donne le port via une variable d'env
-    app.run(host='0.0.0.0', port=port)
+@app.route("/data")
+def data():
+    return jsonify(last_values)
