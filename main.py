@@ -1,0 +1,30 @@
+from flask import Flask, request, render_template_string
+
+app = Flask(__name__)
+
+# Stockage simple des dernières valeurs
+last_values = {
+    "temp": "N/A",
+    "hum": "N/A"
+}
+
+@app.route("/")
+def index():
+    return render_template_string("""
+        <h1>🌿 Suivi de la serre</h1>
+        <p>🌡️ Température : {{ temp }} °C</p>
+        <p>💧 Humidité : {{ hum }} %</p>
+    """, temp=last_values["temp"], hum=last_values["hum"])
+
+@app.route("/update")
+def update():
+    temp = request.args.get("temp")
+    hum = request.args.get("hum")
+    if temp and hum:
+        last_values["temp"] = temp
+        last_values["hum"] = hum
+        return "✅ Données mises à jour"
+    return "❌ Paramètres manquants", 400
+
+if __name__ == "__main__":
+    app.run()
