@@ -1,22 +1,52 @@
-from flask import Flask, request, render_template_string
-import os
+from flask import Flask, request, jsonify
+import threading
 
 app = Flask(__name__)
 
-# Stockage simple des dernières valeurs
+# Valeurs à jour du capteur
 last_values = {
     "temp": "N/A",
     "hum": "N/A"
 }
 
+# Route principale : HTML avec script JavaScript
 @app.route("/")
 def index():
-    return render_template_string("""
-        <h1>🌿 Suivi de la serre</h1>
-        <p>🌡️ Température : {{ temp }} °C</p>
-        <p>💧 Humidité : {{ hum }} %</p>
-    """, temp=last_values["temp"], hum=last_values["hum"])
+    return """
+    <html>
+    <head>
+        <meta charset="utf-8">
+        <title>🌱 Données en direct</title>
+        <style>
+            body { font-family: sans-serif; text-align: center; margin-top: 50px; }
+            h1 { font-size: 2rem; }
+            p { font-size: 1.5rem; }
+        </style>
+        <script>
+            async function fetchData() {
+                try {
+                    const res = await fetch('/data');
+                    const data = await res.json();
+                    document.getElementById('temp').textContent = data.temp || "N/A";
+                    document.getElementById('hum').textContent = data.hum || "N/A";
+                } catch (e) {
+                    console.error("Erreur de récupération des données", e);
+                }
+            }
 
+            setInterval(fetchData, 2000); // actualise toutes les 2s
+            window.onload = fetchData;
+        </script>
+    </head>
+    <body>
+        <h1>🌿 Serre Connectée</h1>
+        <p>🌡️ Température : <span id="temp">N/A</span> °C</p>
+        <p>💧 Humidité : <span id="hum">N/A</span> %</p>
+    </body>
+    </html>
+    """
+
+# L'ESP32 appelle cette route pour envoyer ses données
 @app.route("/update")
 def update():
     temp = request.args.get("temp")
@@ -24,9 +54,10 @@ def update():
     if temp and hum:
         last_values["temp"] = temp
         last_values["hum"] = hum
-        return "✅ Données mises à jour"
+        return "✅ Données reçues"
     return "❌ Paramètres manquants", 400
 
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))  # Render donne le port via une variable d'env
-    app.run(host='0.0.0.0', port=port)
+# Cette route est appelée par le JavaScript pour actualiser l'affichage
+@app.route("/data")
+def data():
+    return jsonify(last_values)
